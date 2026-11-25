@@ -3,7 +3,7 @@
 use core::fmt::Debug;
 use usb_device::UsbError;
 use usb_device::bus::UsbBus;
-use usb_device::class::ControlIn;
+use usb_device::class::{ControlIn, ControlOut};
 use usb_device::descriptor::DescriptorWriter;
 
 #[cfg(feature = "bbb")]
@@ -35,6 +35,9 @@ pub trait Transport {
     fn reset(&mut self);
 
     fn control_in(&mut self, xfer: ControlIn<Self::Bus>);
+
+    /// Handles host-to-device control requests. Ignores them by default.
+    fn control_out(&mut self, _xfer: ControlOut<Self::Bus>) {}
 
     /// Drives the IO.
     ///

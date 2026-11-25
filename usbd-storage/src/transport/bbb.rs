@@ -8,7 +8,7 @@ use core::borrow::BorrowMut;
 use core::cmp::min;
 use usb_device::UsbError;
 use usb_device::bus::{UsbBus, UsbBusAllocator};
-use usb_device::class::ControlIn;
+use usb_device::class::{ControlIn, ControlOut};
 use usb_device::class_prelude::DescriptorWriter;
 use usb_device::control::{Recipient, RequestType};
 use usb_device::endpoint::{Endpoint, In, Out};
@@ -300,10 +300,16 @@ where
     }
 
     fn enter_state_command_transfer(&mut self) {
-        self.cs = None;
-        self.left_to_transfer = 0;
         self.in_ep.unstall();
         self.out_ep.unstall();
+        self.enter_state_command_transfer_keep_stall();
+    }
+
+    /// Like [Self::enter_state_command_transfer], but leaves the endpoints' STALL
+    /// conditions untouched, as the Bulk-Only Mass Storage Reset requires (Spec. 3.1)
+    fn enter_state_command_transfer_keep_stall(&mut self) {
+        self.cs = None;
+        self.left_to_transfer = 0;
         self.buf.clear();
 
         self.state = State::CommandTransfer;
@@ -706,21 +712,40 @@ where
 
         trace!("usb: bbb: Recv ctrl_in: {}", req);
 
-        match req.request {
-            // Spec. section 3.1
-            CLASS_SPECIFIC_BULK_ONLY_MASS_STORAGE_RESET => {
-                self.enter_state_command_transfer();
+        // Spec. section 3.2
+        if req.request == CLASS_SPECIFIC_GET_MAX_LUN {
+            // always respond with LUN. A failure here means the host
+            // misbehaved or the bus glitched mid control-transfer; log and
+            // return rather than panicking the device.
+            if let Err(err) = xfer.accept_with(&[self.max_lun]) {
+                warning!("usb: bbb: Get Max Lun accept failed: {}", err);
             }
-            // Spec. section 3.2
-            CLASS_SPECIFIC_GET_MAX_LUN => {
-                // always respond with LUN. A failure here means the host
-                // misbehaved or the bus glitched mid control-transfer; log and
-                // return rather than panicking the device.
-                if let Err(err) = xfer.accept_with(&[self.max_lun]) {
-                    warning!("usb: bbb: Get Max Lun accept failed: {}", err);
-                }
+        }
+    }
+
+    fn control_out(&mut self, xfer: ControlOut<Self::Bus>) {
+        let req = xfer.request();
+
+        // not interested in this request
+        if !(req.request_type == RequestType::Class && req.recipient == Recipient::Interface) {
+            return;
+        }
+
+        trace!("usb: bbb: Recv ctrl_out: {}", req);
+
+        // Spec. section 3.1
+        // The reset is a host-to-device request without a data stage, so it
+        // arrives here and not in control_in. Get ready for the next CBW, but
+        // keep the STALL conditions: the host clears them with CLEAR_FEATURE
+        // as part of the Reset Recovery (Spec. 5.3.4).
+        if req.request == CLASS_SPECIFIC_BULK_ONLY_MASS_STORAGE_RESET {
+            self.enter_state_command_transfer_keep_stall();
+            if let Err(err) = xfer.accept() {
+                warning!(
+                    "usb: bbb: Bulk-Only Mass Storage Reset accept failed: {}",
+                    err
+                );
             }
-            _ => {}
         }
     }
 
