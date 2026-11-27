@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Examples: fix panics on READ CAPACITY (16) and out-of-range READ/WRITE, honour the allocation length, report the correct sense length and formatted media (https://github.com/apohrebniak/usbd-storage/pull/41)
 - SCSI, UFI: leave class requests addressed to another interface alone, so a composite device's sibling class keeps its own `bRequest` 0xFE and 0xFF (https://github.com/apohrebniak/usbd-storage/pull/36)
 - BBB: honour the Bulk-Only Mass Storage Reset, which is host-to-device and so never reached `control_in` (https://github.com/apohrebniak/usbd-storage/pull/36)
 - RP2040 example: emit the linker scripts from `build.rs`, so a build from the workspace root links a bootable image (https://github.com/apohrebniak/usbd-storage/pull/37)
