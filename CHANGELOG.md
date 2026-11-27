@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- BBB: don't end a Data-In transfer with a premature short packet (https://github.com/apohrebniak/usbd-storage/pull/43)
 - UFI: bounds-check the CB parse against short command blocks (https://github.com/apohrebniak/usbd-storage/pull/42)
 - Examples: fix panics on READ CAPACITY (16) and out-of-range READ/WRITE, honour the allocation length, report the correct sense length and formatted media (https://github.com/apohrebniak/usbd-storage/pull/41)
 - SCSI, UFI: leave class requests addressed to another interface alone, so a composite device's sibling class keeps its own `bRequest` 0xFE and 0xFF (https://github.com/apohrebniak/usbd-storage/pull/36)
